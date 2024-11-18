@@ -1,14 +1,13 @@
 import jwt from 'jsonwebtoken';
 import UnauthenticatedError from '../errors/unauthenticated';
-import Users from '../models/Employee';
+import Client from '../models/client';
 import { Request, Response, NextFunction } from 'express';
 
 // Extend the Request type to include `user`
 interface AuthenticatedRequest extends Request {
   user?: {
     userId: string;
-    firstname: string;
-    role: string;
+    fullName: string;
   };
 }
 
@@ -35,7 +34,7 @@ const auth = async (req: AuthenticatedRequest, res: Response, next: NextFunction
     const payload = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
     console.log('Token Payload:', payload); // Debugging
 
-    const user = await Users.findById(payload.userId).select('-password');
+    const user = await Client.findById(payload.userId).select('-password');
     if (!user) {
       console.error('User associated with token not found');
       return next(new UnauthenticatedError('Authentication invalid'));
@@ -43,8 +42,7 @@ const auth = async (req: AuthenticatedRequest, res: Response, next: NextFunction
 
     req.user = { 
       userId: user._id.toString(),
-      firstname: user.firstname,
-      role: user.role 
+      fullName: user.fullName // Updated to use fullName instead of firstname
     };
 
     next();
