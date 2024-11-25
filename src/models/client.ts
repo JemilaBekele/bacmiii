@@ -6,13 +6,17 @@ interface ClientDocument extends mongoose.Document {
   phoneNumber: string;
   fullName: string;
   sex: 'Male' | 'Female';
+  prifileImage:string
   fiydaIdImage: string;
   fiydaIdImageback: string;
   password: string;
+  status:string;
+  confirm: boolean;
   workplaceId?: string;
   organization?: string;
   locationStart?: string;
   locationEnd?: string;
+  qrCode?:string;
   createJWT: () => string;
   comparePassword: (candidatePassword: string) => Promise<boolean>;
 }
@@ -34,19 +38,30 @@ const ClientSchema = new mongoose.Schema<ClientDocument>({
     enum: ['Male', 'Female'],
     required: [true, 'Please provide a sex'],
   },
+  prifileImage: {
+    type: String
+  },
   fiydaIdImage: {
     type: String,
-    required: [true, 'Please provide a Fiyda ID'],
+    required: [true, 'Please provide a Fiydaimage ID'],
   },
   fiydaIdImageback: {
     type: String,
-    required: [true, 'Please provide a Fiyda ID'],
+    required: [true, 'Please provide a Fiydaimage ID'],
   },
   password: {
     type: String,
     required: [true, 'Please provide a password'],
     minlength: 8,
     maxlength: 32,
+  },
+  status: {
+    type: String,
+    eum:['Active, Inactive']
+  },
+  confirm: {
+    type: Boolean,
+    default: false,
   },
   workplaceId: {
     type: String,
@@ -64,6 +79,9 @@ const ClientSchema = new mongoose.Schema<ClientDocument>({
     type: String,
     required: false,
   },
+  qrCode: {
+    type: String, // Store the QR code as a string (base64 or a URL)
+  }
 });
 
 // Hash the password before saving
@@ -97,3 +115,13 @@ ClientSchema.methods.comparePassword = async function (candidatePassword: string
 const Client = mongoose.models.Client || mongoose.model<ClientDocument>('Client', ClientSchema);
 
 export default Client;
+
+
+
+//userdata
+//password
+//wallet
+//help& support
+//Privecy Policy
+//term and comdition
+//logout

@@ -1,6 +1,6 @@
 import express from 'express';
 const router = express.Router();
-import { login, upload, register, logout, getAllUsers, getUser, deleteUser, updateUser,changePassword } from '../controllers/Employee/auth';
+import { login,  upload,register, logout, getAllUsers, getUser, deleteUser, updateUser,changePassword } from '../controllers/Employee/auth';
 
 router.route('/register').post(upload, register);
 

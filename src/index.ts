@@ -4,8 +4,9 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import bikeRoutes from './routes/bike';
+import WalletRoutes from './routes/Wallet'
 import auth from './middleware/authentication';
-
+import qrcodeRoutes from './routes/qrcode'
 dotenv.config();
 
 const app = express();
@@ -23,12 +24,12 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-app.get('/', (req: Request, res: Response) => {
-  res.send('Hello from the Node.js backend!');
-});
+
 
 app.use('/api/mobile', authRoutes);
 app.use('/api/mobile/bike', auth, bikeRoutes);
+app.use('/api/mobile/Wallet', auth, WalletRoutes);
+app.use('/api/mobile/qrcode', auth, qrcodeRoutes);
 
 // Global Error-Handling Middleware
 // Global Error-Handling Middleware

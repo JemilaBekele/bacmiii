@@ -4,7 +4,7 @@ import asyncWrapper from '../../middleware/async';
 import Bicycle from '../../models/Bicycle';
 import BadRequestError from '../../errors/bad-request';
 import NotFoundError from '../../errors/not-found';
-
+import QRCode from 'qrcode';
 interface AuthenticatedRequest extends Request {
   user?: {
     userId: string;
@@ -15,20 +15,39 @@ interface AuthenticatedRequest extends Request {
 
 // Create a new bicycle
 const createBicycle = asyncWrapper(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { bicycleId, batteryId, location,status } = req.body;
-  
+  const { bicycleId, batteryId, location, status } = req.body;
+
   const createdBy = {
-    id: req.user?.userId || '', 
+    id: req.user?.userId || '',
   };
 
+  // Check for existing bicycle with the same ID
   const existingBicycle = await Bicycle.findOne({ bicycleId });
   if (existingBicycle) {
     throw new BadRequestError('Bicycle ID already exists. Please use a unique bicycle ID.');
   }
 
-  const bicycle = await Bicycle.create({ bicycleId, batteryId, location, createdBy,status });
-  res.status(StatusCodes.CREATED).json({ bicycle });
+  // Generate QR Code for the bicycle
+  const qrCodeData = `Bicycle:${bicycleId}`;
+  const qrCode = await QRCode.toDataURL(qrCodeData);
+
+  // Create a new bicycle with QR code
+  const bicycle = await Bicycle.create({
+    bicycleId,
+    batteryId,
+    location,
+    status,
+    qrCode, // Add the generated QR code to the database
+    createdBy,
+  });
+
+  res.status(StatusCodes.CREATED).json({ 
+    message: 'Bicycle created successfully', 
+    success: true, 
+    data: bicycle 
+  });
 });
+
 
 // Get a single bicycle by ID
 const getBicycle = asyncWrapper(async (req: Request, res: Response): Promise<void> => {

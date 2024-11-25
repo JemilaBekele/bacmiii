@@ -22,6 +22,9 @@ const bicycleSchema = new Schema({
         eum: ['Mantain','Active', 'Charge'],
     },
     createdBy: userReferenceSchema,
+    qrCode: {
+        type: String, // Store the QR code as a string (base64 or a URL)
+      },
 }, {
     timestamps: true, // Automatically manage createdAt and updatedAt fields
 });

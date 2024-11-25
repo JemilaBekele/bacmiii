@@ -52,4 +52,5 @@ const auth = async (req: AuthenticatedRequest, res: Response, next: NextFunction
   }
 };
 
+
 export default auth;

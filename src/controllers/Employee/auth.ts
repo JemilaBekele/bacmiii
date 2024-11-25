@@ -6,37 +6,37 @@ import UnauthenticatedError from '../../errors/unauthenticated';
 import asyncWrapper from '../../middleware/async';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
-import path from 'path';
+import QRCode from 'qrcode';
+import { uploadImage } from '../../helpers/uploadImage';
+
 
 
 
 
 // Define RequestWithFiles Interface
 interface RequestWithFiles extends Request {
-  files?: Express.Multer.File[] | { [fieldname: string]: Express.Multer.File[] } | undefined;
+  files?: { [fieldname: string]: Express.Multer.File[] } | Express.Multer.File[] | undefined;
 }
 
-// Configure Multer storage
-const storage = multer.diskStorage({
-  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
-    cb(null, 'uploads/'); // Folder where images will be saved
-  },
-  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
-    const uniqueName = `${uuidv4()}-${file.originalname}`;
-    cb(null, uniqueName);
-  },
-});
-
-// Initialize Multer with the storage configuration
-const upload = multer({ storage }).fields([
+const upload = multer({
+  storage: multer.memoryStorage(), // Use memory storage for testing
+}).fields([
   { name: 'fiydaIdImage', maxCount: 1 },
   { name: 'fiydaIdImageback', maxCount: 1 },
 ]);
-
-// Register function with Multer middleware to handle file upload
+// Register function with the updated image upload system
 const register = asyncWrapper(async (req: RequestWithFiles, res: Response): Promise<void> => {
+
+  console.log("Received Body:", req.body);  // Log text fields
+  console.log("Received Files:", req.files);
+
   const { fullName, password, phoneNumber, sex, workplaceId, organization, locationStart, locationEnd } = req.body;
-  console.log(fullName, password, phoneNumber, sex, workplaceId, organization, locationStart, locationEnd)
+
+  // Validate input fields
+  if (!fullName || !password || !phoneNumber || !sex) {
+    throw new BadRequestError('All required fields (fullName, password, phoneNumber, sex) must be provided.');
+  }
+
   // Ensure image files are provided
   if (
     !req.files ||
@@ -44,32 +44,21 @@ const register = asyncWrapper(async (req: RequestWithFiles, res: Response): Prom
     !('fiydaIdImage' in req.files) ||
     !('fiydaIdImageback' in req.files)
   ) {
-    res.status(StatusCodes.BAD_REQUEST).json({
-      
-      message: 'Please provide both front and back images of the Fiyda ID.',
-    });
-    return;
+    throw new BadRequestError('Please provide both front and back images of the Fiyda ID.');
   }
-  
 
-  // Access the uploaded files
+  // Access uploaded files
   const fiydaIdImage = req.files['fiydaIdImage']?.[0];
-  console.log(fiydaIdImage)
   const fiydaIdImageback = req.files['fiydaIdImageback']?.[0];
 
   if (!fiydaIdImage || !fiydaIdImageback) {
-    res.status(StatusCodes.BAD_REQUEST).json({
-      message: 'Both images are required.',
-    });
-    return;
+    throw new BadRequestError('Both images are required.');
   }
 
-  // Get file paths
-  const fiydaIdImagePath = fiydaIdImage.path;
-  const fiydaIdImagebackPath = fiydaIdImageback.path;
-  console.log("Front Image Path:", fiydaIdImagePath);
-  console.log("Back Image Path:", fiydaIdImagebackPath);
-  // Check if phone number already exists
+  // Upload images and get their paths
+  const fiydaIdImagePath = await uploadImage(fiydaIdImage);
+  const fiydaIdImagebackPath = await uploadImage(fiydaIdImageback);
+
   const existingUser = await Client.findOne({ phoneNumber });
   if (existingUser) {
     res.status(StatusCodes.BAD_REQUEST).json({
@@ -77,6 +66,10 @@ const register = asyncWrapper(async (req: RequestWithFiles, res: Response): Prom
     });
     return;
   }
+
+  // Generate QR Code
+  const qrCodeData = `Client:${phoneNumber}`; // You can customize the data encoded in the QR code
+  const qrCode = await QRCode.toDataURL(qrCodeData);
 
   // Create a new user
   const user = await Client.create({
@@ -86,12 +79,14 @@ const register = asyncWrapper(async (req: RequestWithFiles, res: Response): Prom
     sex,
     fiydaIdImage: fiydaIdImagePath,
     fiydaIdImageback: fiydaIdImagebackPath,
-    workplaceId,
-    organization,
+    workplaceId: workplaceId || '',
+    organization: organization || '',
     locationStart,
     locationEnd,
+    qrCode,
   });
-  
+
+  // Generate JWT
   const accessToken = user.createJWT();
 
   // Respond with the created user and token
@@ -106,12 +101,11 @@ const register = asyncWrapper(async (req: RequestWithFiles, res: Response): Prom
       organization: user.organization,
       locationStart: user.locationStart,
       locationEnd: user.locationEnd,
+      qrCode: user.qrCode
     },
     accessToken,
   });
 });
-
-
 
 
 
@@ -134,6 +128,7 @@ const login = asyncWrapper(async (req: Request, res: Response): Promise<void> =>
   const accessToken = user.createJWT();
   res.status(StatusCodes.OK).json({
     user: {
+      id:user._id,
       fullName: user.fullName,
       phoneNumber: user.phoneNumber,
       sex: user.sex,
@@ -157,6 +152,7 @@ const getAllUsers = asyncWrapper(async (_req: Request, res: Response): Promise<v
 const getUser = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
   const { id: userID } = req.params;
   const user = await Client.findById(userID);
+  
   if (!user) {
     res.status(StatusCodes.NOT_FOUND).json({ message: `No user with ID: ${userID}` });
     return;
@@ -164,16 +160,7 @@ const getUser = asyncWrapper(async (req: Request, res: Response): Promise<void> 
   res.status(StatusCodes.OK).json({ user });
 });
 
-// Delete a user by ID
-const deleteUser = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
-  const { id: userID } = req.params;
-  const user = await Client.findByIdAndDelete(userID);
-  if (!user) {
-    res.status(StatusCodes.NOT_FOUND).json({ message: `No user with ID: ${userID}` });
-    return;
-  }
-  res.status(StatusCodes.OK).json({ message: 'User deleted successfully' });
-});
+
 
 // Update a user by ID
 const updateUser = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
@@ -186,7 +173,33 @@ const updateUser = asyncWrapper(async (req: Request, res: Response): Promise<voi
     res.status(StatusCodes.NOT_FOUND).json({ message: `No user with ID: ${userID}` });
     return;
   }
-  res.status(StatusCodes.OK).json({ user });
+
+  res.status(StatusCodes.OK).json({
+    user: {
+      id: user._id, // Include the ID in the response
+      fullName: user.fullName,
+      phoneNumber: user.phoneNumber,
+      sex: user.sex,
+      fiydaIdImage: user.fiydaIdImage,
+      fiydaIdImageback: user.fiydaIdImageback,
+      workplaceId: user.workplaceId,
+      organization: user.organization,
+      locationStart: user.locationStart,
+      locationEnd: user.locationEnd,
+    },
+  });
+ 
+});
+
+// Delete a user by ID
+const deleteUser = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+  const { id: userID } = req.params;
+  const user = await Client.findByIdAndDelete(userID);
+  if (!user) {
+    res.status(StatusCodes.NOT_FOUND).json({ message: `No user with ID: ${userID}` });
+    return;
+  }
+  res.status(StatusCodes.OK).json({ message: 'User deleted successfully' });
 });
 
 // Logout user
